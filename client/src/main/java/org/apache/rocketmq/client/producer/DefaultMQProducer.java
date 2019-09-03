@@ -319,6 +319,8 @@ public class DefaultMQProducer extends ClientConfig implements MQProducer {
      * Send message in synchronous mode. This method returns only when the sending procedure totally completes.
      * </p>
      *
+     *  对defaultMQProducerImpl#send方法的封装
+     *
      * <strong>Warn:</strong> this method has internal retry-mechanism, that is, internal implementation will retry
      * {@link #retryTimesWhenSendFailed} times before claiming failure. As a result, multiple messages may potentially
      * delivered to broker(s). It's up to the application developers to resolve potential duplication issue.

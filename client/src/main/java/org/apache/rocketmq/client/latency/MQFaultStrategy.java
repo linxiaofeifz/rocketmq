@@ -28,7 +28,7 @@ public class MQFaultStrategy {
     // key brokerName
     private final LatencyFaultTolerance<String> latencyFaultTolerance = new LatencyFaultToleranceImpl();
 
-    // 延迟容错开关
+    // 延迟容错开关，默认关闭
     private boolean sendLatencyFaultEnable = false;
 
     // 延迟级别数组
@@ -68,22 +68,29 @@ public class MQFaultStrategy {
      * @return org.apache.rocketmq.common.message.MessageQueue 
     */
     public MessageQueue selectOneMessageQueue(final TopicPublishInfo tpInfo, final String lastBrokerName) {
+        // 开启容错时
+        // 优先获取可用队列，其次选择一个broker获取队列，最差返回任意一个broker的队列
         if (this.sendLatencyFaultEnable) {
             try {
                 int index = tpInfo.getSendWhichQueue().getAndIncrement();
                 for (int i = 0; i < tpInfo.getMessageQueueList().size(); i++) {
+                    // 队列下标
                     int pos = Math.abs(index++) % tpInfo.getMessageQueueList().size();
                     if (pos < 0)
                         pos = 0;
                     MessageQueue mq = tpInfo.getMessageQueueList().get(pos);
+                    // 获取 brokerName=lastBrokerName && 可用的一个消息队列
                     if (latencyFaultTolerance.isAvailable(mq.getBrokerName())) {
+                        // 第一次选择队列的时候，lastBrokerName == null
                         if (null == lastBrokerName || mq.getBrokerName().equals(lastBrokerName))
                             return mq;
                     }
                 }
 
+                // 选择一个相对较好的broker
                 final String notBestBroker = latencyFaultTolerance.pickOneAtLeast();
                 int writeQueueNums = tpInfo.getQueueIdByBroker(notBestBroker);
+                // 获取消息队列，不考虑队列可用性
                 if (writeQueueNums > 0) {
                     final MessageQueue mq = tpInfo.selectOneMessageQueue();
                     if (notBestBroker != null) {
@@ -98,19 +105,36 @@ public class MQFaultStrategy {
                 log.error("Error occurred when selecting message queue", e);
             }
 
+            // 选择一个消息队列，不考虑队列可用性
             return tpInfo.selectOneMessageQueue();
         }
 
+        // 未开启容错时
+        // 获取lastBrokerName的一个消息队列，不考虑队列可用性
         return tpInfo.selectOneMessageQueue(lastBrokerName);
     }
 
+    /**
+     * <p>更新延迟容错信息</p>
+     * @param brokerName :
+     * @param currentLatency : 延迟
+     * @param isolation : 是否隔离。开启隔离时，默认延迟30000。目前主要用于发送消息异常时
+     * @return void
+    */
     public void updateFaultItem(final String brokerName, final long currentLatency, boolean isolation) {
+        // 只有开启容错，才需要更新容错信息
         if (this.sendLatencyFaultEnable) {
+            // 计算对应延迟不可用时间
             long duration = computeNotAvailableDuration(isolation ? 30000 : currentLatency);
             this.latencyFaultTolerance.updateFaultItem(brokerName, currentLatency, duration);
         }
     }
 
+    /**
+     * <p>计算延迟对应的不可用时间</p>
+     * @param currentLatency : 延迟
+     * @return long   不可用时间
+    */
     private long computeNotAvailableDuration(final long currentLatency) {
         for (int i = latencyMax.length - 1; i >= 0; i--) {
             if (currentLatency >= latencyMax[i])

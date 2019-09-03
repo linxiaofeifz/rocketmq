@@ -17,37 +17,63 @@
 
 package org.apache.rocketmq.client.latency;
 
+import org.apache.rocketmq.client.common.ThreadLocalIndex;
+
 import java.util.Collections;
 import java.util.Enumeration;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.concurrent.ConcurrentHashMap;
-import org.apache.rocketmq.client.common.ThreadLocalIndex;
 
 public class LatencyFaultToleranceImpl implements LatencyFaultTolerance<String> {
+
+    /**
+     * 对象故障信息表
+     */
     private final ConcurrentHashMap<String, FaultItem> faultItemTable = new ConcurrentHashMap<String, FaultItem>(16);
 
+    /**
+     * 故障对象选择index
+     */
     private final ThreadLocalIndex whichItemWorst = new ThreadLocalIndex();
 
+    /**
+     * <p>更新延迟和不可用时长</p>
+     * @param name :
+     * @param currentLatency :
+     * @param notAvailableDuration :
+     * @return void
+    */
     @Override
     public void updateFaultItem(final String name, final long currentLatency, final long notAvailableDuration) {
+        // 获取到旧的故障对象
         FaultItem old = this.faultItemTable.get(name);
+        // 没有旧的故障对象
         if (null == old) {
+            // 创建一个故障对象，设置延迟和开始可用时间
             final FaultItem faultItem = new FaultItem(name);
             faultItem.setCurrentLatency(currentLatency);
             faultItem.setStartTimestamp(System.currentTimeMillis() + notAvailableDuration);
 
+            // 往故障对象表放入新创建的故障对象
             old = this.faultItemTable.putIfAbsent(name, faultItem);
+            // 如果新创建的故障对象放入失败，说明故障表中存在旧的故障对象，直接更新旧故障对象的延迟和开始可用时间
             if (old != null) {
                 old.setCurrentLatency(currentLatency);
                 old.setStartTimestamp(System.currentTimeMillis() + notAvailableDuration);
             }
         } else {
+            // 直接更新旧的故障对象的延迟和开始可用时间
             old.setCurrentLatency(currentLatency);
             old.setStartTimestamp(System.currentTimeMillis() + notAvailableDuration);
         }
     }
 
+    /**
+     * <p>故障对象是否可用</p>
+     * @param name :
+     * @return boolean
+    */
     @Override
     public boolean isAvailable(final String name) {
         final FaultItem faultItem = this.faultItemTable.get(name);
@@ -57,14 +83,26 @@ public class LatencyFaultToleranceImpl implements LatencyFaultTolerance<String> 
         return true;
     }
 
+    /**
+     * <p>移除故障对象</p>
+     * @param name :
+     * @return void
+    */
     @Override
     public void remove(final String name) {
         this.faultItemTable.remove(name);
     }
 
+    /**
+     * <p>选择一个相对较好的故障对象</p>
+     * @author linxf
+     * @date  2019/9/3 10:14
+     * @return java.lang.String
+    */
     @Override
     public String pickOneAtLeast() {
         final Enumeration<FaultItem> elements = this.faultItemTable.elements();
+        // 所有故障对象的数组
         List<FaultItem> tmpList = new LinkedList<FaultItem>();
         while (elements.hasMoreElements()) {
             final FaultItem faultItem = elements.nextElement();
@@ -72,11 +110,15 @@ public class LatencyFaultToleranceImpl implements LatencyFaultTolerance<String> 
         }
 
         if (!tmpList.isEmpty()) {
+            // 打乱
             Collections.shuffle(tmpList);
 
+            // 排序
             Collections.sort(tmpList);
 
+            // 选择排序在前一半的故障对象
             final int half = tmpList.size() / 2;
+            // 只有一个的情况
             if (half <= 0) {
                 return tmpList.get(0).getName();
             } else {
@@ -85,6 +127,7 @@ public class LatencyFaultToleranceImpl implements LatencyFaultTolerance<String> 
             }
         }
 
+        // 没有任何故障对象，返回null
         return null;
     }
 
@@ -96,15 +139,35 @@ public class LatencyFaultToleranceImpl implements LatencyFaultTolerance<String> 
             '}';
     }
 
+    /**
+     *  <p>故障对象</p>
+     *  <p>维护对象名称、延迟、开始可用时间</p>
+     *  <p>对象相等，需要对象名称、延迟、开始可用时间都相同</p>
+     */
     class FaultItem implements Comparable<FaultItem> {
+        /**
+         * 故障对象名称
+         */
         private final String name;
+        /**
+         * 延迟
+         */
         private volatile long currentLatency;
+        /**
+         * 开始可用时间
+         */
         private volatile long startTimestamp;
 
         public FaultItem(final String name) {
             this.name = name;
         }
 
+        /**
+         * <p>对象比较</p>
+         * <p>可用性 > 延迟 > 开始可用时间</p>
+         * @param other :
+         * @return int  升序
+        */
         @Override
         public int compareTo(final FaultItem other) {
             if (this.isAvailable() != other.isAvailable()) {
@@ -130,6 +193,11 @@ public class LatencyFaultToleranceImpl implements LatencyFaultTolerance<String> 
             return 0;
         }
 
+        /**
+         * <p>是否可用</p>
+         * <p>当开始可用时间早于当前时间</p>
+         * @return boolean
+        */
         public boolean isAvailable() {
             return (System.currentTimeMillis() - startTimestamp) >= 0;
         }

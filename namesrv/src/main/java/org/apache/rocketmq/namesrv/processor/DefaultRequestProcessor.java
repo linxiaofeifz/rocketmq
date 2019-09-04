@@ -197,6 +197,7 @@ public class DefaultRequestProcessor implements NettyRequestProcessor {
         final RegisterBrokerRequestHeader requestHeader =
             (RegisterBrokerRequestHeader) request.decodeCommandCustomHeader(RegisterBrokerRequestHeader.class);
 
+        // 检查crc32是否相等
         if (!checksum(ctx, request, requestHeader)) {
             response.setCode(ResponseCode.SYSTEM_ERROR);
             response.setRemark("crc32 not match");
@@ -207,15 +208,18 @@ public class DefaultRequestProcessor implements NettyRequestProcessor {
 
         if (request.getBody() != null) {
             try {
+                // 如果body已压缩，则先解压
                 registerBrokerBody = RegisterBrokerBody.decode(request.getBody(), requestHeader.isCompressed());
             } catch (Exception e) {
                 throw new RemotingCommandException("Failed to decode RegisterBrokerBody", e);
             }
         } else {
+            // 如果body为空，会将topic的版本号默认置为0
             registerBrokerBody.getTopicConfigSerializeWrapper().getDataVersion().setCounter(new AtomicLong(0));
             registerBrokerBody.getTopicConfigSerializeWrapper().getDataVersion().setTimestamp(0);
         }
 
+        // 使用broker上报的信息更新nameserv的RouteInfo
         RegisterBrokerResult result = this.namesrvController.getRouteInfoManager().registerBroker(
             requestHeader.getClusterName(),
             requestHeader.getBrokerAddr(),
@@ -226,9 +230,11 @@ public class DefaultRequestProcessor implements NettyRequestProcessor {
             registerBrokerBody.getFilterServerList(),
             ctx.channel());
 
+        // 如果broker是slave的话，会将master address和ha server address通过response返回给broker
         responseHeader.setHaServerAddr(result.getHaServerAddr());
         responseHeader.setMasterAddr(result.getMasterAddr());
 
+        // 将Order topic的KV配置信息通过response返回
         byte[] jsonValue = this.namesrvController.getKvConfigManager().getKVListByNamespace(NamesrvUtil.NAMESPACE_ORDER_TOPIC_CONFIG);
         response.setBody(jsonValue);
 
@@ -346,9 +352,11 @@ public class DefaultRequestProcessor implements NettyRequestProcessor {
         final GetRouteInfoRequestHeader requestHeader =
             (GetRouteInfoRequestHeader) request.decodeCommandCustomHeader(GetRouteInfoRequestHeader.class);
 
+        // 从RouteInfoManager中获取topic的路由信息
         TopicRouteData topicRouteData = this.namesrvController.getRouteInfoManager().pickupTopicRouteData(requestHeader.getTopic());
 
         if (topicRouteData != null) {
+            // 如果支持顺序消息，则填充KVConfig信息
             if (this.namesrvController.getNamesrvConfig().isOrderMessageEnable()) {
                 String orderTopicConf =
                     this.namesrvController.getKvConfigManager().getKVConfig(NamesrvUtil.NAMESPACE_ORDER_TOPIC_CONFIG,

@@ -114,6 +114,18 @@ public class RouteInfoManager {
         return topicList.encode();
     }
 
+    /**
+     * <p>注册broker,更新routeinfo信息</p>
+     * @param clusterName :
+     * @param brokerAddr :
+     * @param brokerName :
+     * @param brokerId :
+     * @param haServerAddr :
+     * @param topicConfigWrapper :
+     * @param filterServerList :
+     * @param channel :
+     * @return org.apache.rocketmq.common.namesrv.RegisterBrokerResult
+    */
     public RegisterBrokerResult registerBroker(
         final String clusterName,
         final String brokerAddr,
@@ -126,8 +138,10 @@ public class RouteInfoManager {
         RegisterBrokerResult result = new RegisterBrokerResult();
         try {
             try {
+                // 获取写锁
                 this.lock.writeLock().lockInterruptibly();
 
+                // 更新cluster和broker对应关系
                 Set<String> brokerNames = this.clusterAddrTable.get(clusterName);
                 if (null == brokerNames) {
                     brokerNames = new HashSet<String>();
@@ -137,6 +151,7 @@ public class RouteInfoManager {
 
                 boolean registerFirst = false;
 
+                // 更新brokername和brokerdata的map
                 BrokerData brokerData = this.brokerAddrTable.get(brokerName);
                 if (null == brokerData) {
                     registerFirst = true;
@@ -146,6 +161,7 @@ public class RouteInfoManager {
                 Map<Long, String> brokerAddrsMap = brokerData.getBrokerAddrs();
                 //Switch slave to master: first remove <1, IP:PORT> in namesrv, then add <0, IP:PORT>
                 //The same IP:PORT must only have one record in brokerAddrTable
+                // 一个brokerAddr 在brokerAddrTable里只能有一条记录
                 Iterator<Entry<Long, String>> it = brokerAddrsMap.entrySet().iterator();
                 while (it.hasNext()) {
                     Entry<Long, String> item = it.next();
@@ -157,6 +173,7 @@ public class RouteInfoManager {
                 String oldAddr = brokerData.getBrokerAddrs().put(brokerId, brokerAddr);
                 registerFirst = registerFirst || (null == oldAddr);
 
+                // 如果是master broker，第一次注册或者是topic信息发生变化了，更新topicQueueTable
                 if (null != topicConfigWrapper
                     && MixAll.MASTER_ID == brokerId) {
                     if (this.isBrokerTopicConfigChanged(brokerAddr, topicConfigWrapper.getDataVersion())
@@ -171,6 +188,7 @@ public class RouteInfoManager {
                     }
                 }
 
+                // 更新broker的心跳时间
                 BrokerLiveInfo prevBrokerLiveInfo = this.brokerLiveTable.put(brokerAddr,
                     new BrokerLiveInfo(
                         System.currentTimeMillis(),
@@ -181,6 +199,7 @@ public class RouteInfoManager {
                     log.info("new broker registered, {} HAServer: {}", brokerAddr, haServerAddr);
                 }
 
+                // 更新filter server table
                 if (filterServerList != null) {
                     if (filterServerList.isEmpty()) {
                         this.filterServerTable.remove(brokerAddr);
@@ -189,6 +208,7 @@ public class RouteInfoManager {
                     }
                 }
 
+                //如 果是slave broker注册，如果master存在，则返回master broker信息
                 if (MixAll.MASTER_ID != brokerId) {
                     String masterAddr = brokerData.getBrokerAddrs().get(MixAll.MASTER_ID);
                     if (masterAddr != null) {
@@ -386,6 +406,11 @@ public class RouteInfoManager {
         }
     }
 
+    /** 
+     * <p>查询topic的路由信息</p>
+     * @param topic :
+     * @return org.apache.rocketmq.common.protocol.route.TopicRouteData 
+    */
     public TopicRouteData pickupTopicRouteData(final String topic) {
         TopicRouteData topicRouteData = new TopicRouteData();
         boolean foundQueueData = false;
@@ -399,12 +424,15 @@ public class RouteInfoManager {
 
         try {
             try {
+                // 获取读锁
                 this.lock.readLock().lockInterruptibly();
+                // 获取队列数据
                 List<QueueData> queueDataList = this.topicQueueTable.get(topic);
                 if (queueDataList != null) {
                     topicRouteData.setQueueDatas(queueDataList);
                     foundQueueData = true;
 
+                    // 获取brokerName集合
                     Iterator<QueueData> it = queueDataList.iterator();
                     while (it.hasNext()) {
                         QueueData qd = it.next();
@@ -412,6 +440,7 @@ public class RouteInfoManager {
                     }
 
                     for (String brokerName : brokerNameSet) {
+                        // 根据brokerName获取broker主从地址信息
                         BrokerData brokerData = this.brokerAddrTable.get(brokerName);
                         if (null != brokerData) {
                             BrokerData brokerDataClone = new BrokerData(brokerData.getCluster(), brokerData.getBrokerName(), (HashMap<Long, String>) brokerData
@@ -426,6 +455,7 @@ public class RouteInfoManager {
                     }
                 }
             } finally {
+                // 释放读锁
                 this.lock.readLock().unlock();
             }
         } catch (Exception e) {

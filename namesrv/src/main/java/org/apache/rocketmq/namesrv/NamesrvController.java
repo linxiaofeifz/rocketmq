@@ -158,6 +158,11 @@ public class NamesrvController {
         return true;
     }
 
+    /**
+     * <p>注册Processor</p>
+     * <p>默认注册DefaultRequestProcessor</p>
+     * @return void
+    */
     private void registerProcessor() {
         if (namesrvConfig.isClusterTest()) {
 

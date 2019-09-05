@@ -190,6 +190,12 @@ public class DefaultRequestProcessor implements NettyRequestProcessor {
         return response;
     }
 
+    /**
+     * <p>注册broker</p>
+     * @param ctx :
+     * @param request :
+     * @return org.apache.rocketmq.remoting.protocol.RemotingCommand
+    */
     public RemotingCommand registerBrokerWithFilterServer(ChannelHandlerContext ctx, RemotingCommand request)
         throws RemotingCommandException {
         final RemotingCommand response = RemotingCommand.createResponseCommand(RegisterBrokerResponseHeader.class);
@@ -323,12 +329,19 @@ public class DefaultRequestProcessor implements NettyRequestProcessor {
         return response;
     }
 
+    /**
+     * <p>注销broker</p>
+     * @param ctx :
+     * @param request :
+     * @return org.apache.rocketmq.remoting.protocol.RemotingCommand
+    */
     public RemotingCommand unregisterBroker(ChannelHandlerContext ctx,
         RemotingCommand request) throws RemotingCommandException {
         final RemotingCommand response = RemotingCommand.createResponseCommand(null);
         final UnRegisterBrokerRequestHeader requestHeader =
             (UnRegisterBrokerRequestHeader) request.decodeCommandCustomHeader(UnRegisterBrokerRequestHeader.class);
 
+        // 调用RouteInfoManager的注销broker,移除该broker对应的数据
         this.namesrvController.getRouteInfoManager().unregisterBroker(
             requestHeader.getClusterName(),
             requestHeader.getBrokerAddr(),
@@ -377,6 +390,12 @@ public class DefaultRequestProcessor implements NettyRequestProcessor {
         return response;
     }
 
+    /**
+     * <p>获取集群信息</p>
+     * @param ctx :
+     * @param request :
+     * @return org.apache.rocketmq.remoting.protocol.RemotingCommand
+    */
     private RemotingCommand getBrokerClusterInfo(ChannelHandlerContext ctx, RemotingCommand request) {
         final RemotingCommand response = RemotingCommand.createResponseCommand(null);
 
@@ -408,6 +427,12 @@ public class DefaultRequestProcessor implements NettyRequestProcessor {
         return response;
     }
 
+    /**
+     * <p>获取所有的topic信息</p>
+     * @param ctx :
+     * @param request :
+     * @return org.apache.rocketmq.remoting.protocol.RemotingCommand
+    */
     private RemotingCommand getAllTopicListFromNameserver(ChannelHandlerContext ctx, RemotingCommand request) {
         final RemotingCommand response = RemotingCommand.createResponseCommand(null);
 

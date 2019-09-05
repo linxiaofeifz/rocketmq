@@ -18,6 +18,14 @@
 package org.apache.rocketmq.common.protocol.body;
 
 import com.alibaba.fastjson.JSON;
+import org.apache.rocketmq.common.DataVersion;
+import org.apache.rocketmq.common.MixAll;
+import org.apache.rocketmq.common.TopicConfig;
+import org.apache.rocketmq.common.constant.LoggerName;
+import org.apache.rocketmq.logging.InternalLogger;
+import org.apache.rocketmq.logging.InternalLoggerFactory;
+import org.apache.rocketmq.remoting.protocol.RemotingSerializable;
+
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
@@ -30,13 +38,6 @@ import java.util.concurrent.ConcurrentMap;
 import java.util.zip.Deflater;
 import java.util.zip.DeflaterOutputStream;
 import java.util.zip.InflaterInputStream;
-import org.apache.rocketmq.common.DataVersion;
-import org.apache.rocketmq.common.MixAll;
-import org.apache.rocketmq.common.TopicConfig;
-import org.apache.rocketmq.common.constant.LoggerName;
-import org.apache.rocketmq.logging.InternalLogger;
-import org.apache.rocketmq.logging.InternalLoggerFactory;
-import org.apache.rocketmq.remoting.protocol.RemotingSerializable;
 
 public class RegisterBrokerBody extends RemotingSerializable {
 
@@ -95,23 +96,34 @@ public class RegisterBrokerBody extends RemotingSerializable {
         return null;
     }
 
+    /**
+     * <p>解码请求数据，根据请求数据创建broker注册的请求数据</p>
+     * @param data :
+     * @param compressed :
+     * @return org.apache.rocketmq.common.protocol.body.RegisterBrokerBody
+    */
     public static RegisterBrokerBody decode(byte[] data, boolean compressed) throws IOException {
+        // 数据没有进行压缩，直接反序列化
         if (!compressed) {
             return RegisterBrokerBody.decode(data, RegisterBrokerBody.class);
         }
         long start = System.currentTimeMillis();
         InflaterInputStream inflaterInputStream = new InflaterInputStream(new ByteArrayInputStream(data));
+        // 读取dataversion 长度
         int dataVersionLength = readInt(inflaterInputStream);
+        // 根据dataversion长度读取dataversion
         byte[] dataVersionBytes = readBytes(inflaterInputStream, dataVersionLength);
         DataVersion dataVersion = DataVersion.decode(dataVersionBytes, DataVersion.class);
 
         RegisterBrokerBody registerBrokerBody = new RegisterBrokerBody();
+        // 设置dataversion
         registerBrokerBody.getTopicConfigSerializeWrapper().setDataVersion(dataVersion);
         ConcurrentMap<String, TopicConfig> topicConfigTable = registerBrokerBody.getTopicConfigSerializeWrapper().getTopicConfigTable();
 
         int topicConfigNumber = readInt(inflaterInputStream);
         LOGGER.debug("{} topic configs to extract", topicConfigNumber);
 
+        // 配置topic
         for (int i = 0; i < topicConfigNumber; i++) {
             int topicConfigJsonLength = readInt(inflaterInputStream);
 
@@ -122,6 +134,7 @@ public class RegisterBrokerBody extends RemotingSerializable {
             topicConfigTable.put(topicConfig.getTopicName(), topicConfig);
         }
 
+        // 配置filter server
         int filterServerListJsonLength = readInt(inflaterInputStream);
 
         byte[] filterServerListBuffer = readBytes(inflaterInputStream, filterServerListJsonLength);

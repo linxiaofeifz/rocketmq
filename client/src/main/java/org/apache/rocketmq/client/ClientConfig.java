@@ -16,8 +16,6 @@
  */
 package org.apache.rocketmq.client;
 
-import java.util.HashSet;
-import java.util.Set;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.rocketmq.common.UtilAll;
 import org.apache.rocketmq.common.message.MessageQueue;
@@ -26,6 +24,9 @@ import org.apache.rocketmq.common.utils.NameServerAddressUtils;
 import org.apache.rocketmq.remoting.common.RemotingUtil;
 import org.apache.rocketmq.remoting.netty.TlsSystemConfig;
 import org.apache.rocketmq.remoting.protocol.LanguageCode;
+
+import java.util.HashSet;
+import java.util.Set;
 
 /**
  * Client Common configuration
@@ -59,6 +60,11 @@ public class ClientConfig {
 
     private LanguageCode language = LanguageCode.JAVA;
 
+    /**
+     * <p>创建clientId</p>
+     * <p>ip@instancename@unitname</p>
+     * @return java.lang.String
+    */
     public String buildMQClientId() {
         StringBuilder sb = new StringBuilder();
         sb.append(this.getClientIP());
@@ -89,6 +95,10 @@ public class ClientConfig {
         this.instanceName = instanceName;
     }
 
+    /**
+     * <p>设置InstanceName，使用进程ID (PID)</p>
+     * @return void
+    */
     public void changeInstanceNameToPID() {
         if (this.instanceName.equals("DEFAULT")) {
             this.instanceName = String.valueOf(UtilAll.getPid());

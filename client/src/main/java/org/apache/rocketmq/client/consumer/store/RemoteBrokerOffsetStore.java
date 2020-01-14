@@ -16,13 +16,6 @@
  */
 package org.apache.rocketmq.client.consumer.store;
 
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.Map;
-import java.util.Set;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.ConcurrentMap;
-import java.util.concurrent.atomic.AtomicLong;
 import org.apache.rocketmq.client.exception.MQBrokerException;
 import org.apache.rocketmq.client.exception.MQClientException;
 import org.apache.rocketmq.client.impl.FindBrokerResult;
@@ -30,11 +23,19 @@ import org.apache.rocketmq.client.impl.factory.MQClientInstance;
 import org.apache.rocketmq.client.log.ClientLogger;
 import org.apache.rocketmq.common.MixAll;
 import org.apache.rocketmq.common.UtilAll;
-import org.apache.rocketmq.logging.InternalLogger;
 import org.apache.rocketmq.common.message.MessageQueue;
 import org.apache.rocketmq.common.protocol.header.QueryConsumerOffsetRequestHeader;
 import org.apache.rocketmq.common.protocol.header.UpdateConsumerOffsetRequestHeader;
+import org.apache.rocketmq.logging.InternalLogger;
 import org.apache.rocketmq.remoting.exception.RemotingException;
+
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.Map;
+import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentMap;
+import java.util.concurrent.atomic.AtomicLong;
 
 /**
  * Remote storage implementation
@@ -116,6 +117,7 @@ public class RemoteBrokerOffsetStore implements OffsetStore {
         if (null == mqs || mqs.isEmpty())
             return;
 
+        // 遍历offsetTable，将队列与其offset更新到broker
         final HashSet<MessageQueue> unusedMQ = new HashSet<MessageQueue>();
         if (!mqs.isEmpty()) {
             for (Map.Entry<MessageQueue, AtomicLong> entry : this.offsetTable.entrySet()) {
@@ -140,6 +142,7 @@ public class RemoteBrokerOffsetStore implements OffsetStore {
             }
         }
 
+        // 以mqs为准，移除offsetTable中没有的队列
         if (!unusedMQ.isEmpty()) {
             for (MessageQueue mq : unusedMQ) {
                 this.offsetTable.remove(mq);

@@ -20,14 +20,15 @@
  */
 package org.apache.rocketmq.common.namesrv;
 
-import java.io.IOException;
 import org.apache.rocketmq.common.MixAll;
 import org.apache.rocketmq.common.UtilAll;
 import org.apache.rocketmq.common.constant.LoggerName;
 import org.apache.rocketmq.common.help.FAQUrl;
+import org.apache.rocketmq.common.utils.HttpTinyClient;
 import org.apache.rocketmq.logging.InternalLogger;
 import org.apache.rocketmq.logging.InternalLoggerFactory;
-import org.apache.rocketmq.common.utils.HttpTinyClient;
+
+import java.io.IOException;
 
 public class TopAddressing {
     private static final InternalLogger log = InternalLoggerFactory.getLogger(LoggerName.COMMON_LOGGER_NAME);
@@ -64,6 +65,12 @@ public class TopAddressing {
         return fetchNSAddr(true, 3000);
     }
 
+    /**
+     * <p>从http server获取namesvr地址</p>
+     * @param verbose :
+     * @param timeoutMills :
+     * @return java.lang.String
+    */
     public final String fetchNSAddr(boolean verbose, long timeoutMills) {
         String url = this.wsAddr;
         try {

@@ -16,13 +16,6 @@
  */
 package org.apache.rocketmq.client.impl.consumer;
 
-import java.util.ArrayList;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Map;
-import java.util.Properties;
-import java.util.Set;
-import java.util.concurrent.ConcurrentMap;
 import org.apache.rocketmq.client.QueryResult;
 import org.apache.rocketmq.client.Validators;
 import org.apache.rocketmq.client.consumer.DefaultMQPullConsumer;
@@ -50,21 +43,20 @@ import org.apache.rocketmq.common.consumer.ConsumeFromWhere;
 import org.apache.rocketmq.common.filter.ExpressionType;
 import org.apache.rocketmq.common.filter.FilterAPI;
 import org.apache.rocketmq.common.help.FAQUrl;
+import org.apache.rocketmq.common.message.*;
 import org.apache.rocketmq.common.protocol.NamespaceUtil;
-import org.apache.rocketmq.logging.InternalLogger;
-import org.apache.rocketmq.common.message.Message;
-import org.apache.rocketmq.common.message.MessageAccessor;
-import org.apache.rocketmq.common.message.MessageConst;
-import org.apache.rocketmq.common.message.MessageExt;
-import org.apache.rocketmq.common.message.MessageQueue;
 import org.apache.rocketmq.common.protocol.body.ConsumerRunningInfo;
 import org.apache.rocketmq.common.protocol.heartbeat.ConsumeType;
 import org.apache.rocketmq.common.protocol.heartbeat.MessageModel;
 import org.apache.rocketmq.common.protocol.heartbeat.SubscriptionData;
 import org.apache.rocketmq.common.sysflag.PullSysFlag;
+import org.apache.rocketmq.logging.InternalLogger;
 import org.apache.rocketmq.remoting.RPCHook;
 import org.apache.rocketmq.remoting.common.RemotingHelper;
 import org.apache.rocketmq.remoting.exception.RemotingException;
+
+import java.util.*;
+import java.util.concurrent.ConcurrentMap;
 
 public class DefaultMQPullConsumerImpl implements MQConsumerInner {
     private final InternalLogger log = ClientLogger.getLog();
@@ -380,11 +372,17 @@ public class DefaultMQPullConsumerImpl implements MQConsumerInner {
         }
     }
 
+    /**
+     * <p>持久化offset</p>
+     * @return void
+    */
     @Override
     public void persistConsumerOffset() {
         try {
+            // 需要消费者实在running状态
             this.isRunning();
             Set<MessageQueue> mqs = new HashSet<MessageQueue>();
+            // 获取所有消息队列
             Set<MessageQueue> allocateMq = this.rebalanceImpl.getProcessQueueTable().keySet();
             mqs.addAll(allocateMq);
             this.offsetStore.persistAll(mqs);

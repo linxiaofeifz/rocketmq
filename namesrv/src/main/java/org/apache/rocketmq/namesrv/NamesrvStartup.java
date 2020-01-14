@@ -19,12 +19,6 @@ package org.apache.rocketmq.namesrv;
 import ch.qos.logback.classic.LoggerContext;
 import ch.qos.logback.classic.joran.JoranConfigurator;
 import ch.qos.logback.core.joran.spi.JoranException;
-import java.io.BufferedInputStream;
-import java.io.FileInputStream;
-import java.io.IOException;
-import java.io.InputStream;
-import java.util.Properties;
-import java.util.concurrent.Callable;
 import org.apache.commons.cli.CommandLine;
 import org.apache.commons.cli.Option;
 import org.apache.commons.cli.Options;
@@ -32,14 +26,21 @@ import org.apache.commons.cli.PosixParser;
 import org.apache.rocketmq.common.MQVersion;
 import org.apache.rocketmq.common.MixAll;
 import org.apache.rocketmq.common.constant.LoggerName;
+import org.apache.rocketmq.common.namesrv.NamesrvConfig;
 import org.apache.rocketmq.logging.InternalLogger;
 import org.apache.rocketmq.logging.InternalLoggerFactory;
-import org.apache.rocketmq.common.namesrv.NamesrvConfig;
 import org.apache.rocketmq.remoting.netty.NettyServerConfig;
 import org.apache.rocketmq.remoting.protocol.RemotingCommand;
 import org.apache.rocketmq.srvutil.ServerUtil;
 import org.apache.rocketmq.srvutil.ShutdownHookThread;
 import org.slf4j.LoggerFactory;
+
+import java.io.BufferedInputStream;
+import java.io.FileInputStream;
+import java.io.IOException;
+import java.io.InputStream;
+import java.util.Properties;
+import java.util.concurrent.Callable;
 
 public class NamesrvStartup {
 
@@ -68,7 +69,13 @@ public class NamesrvStartup {
         return null;
     }
 
+    /**
+     * <p>创建namesvr controller</p>
+     * @param args :
+     * @return org.apache.rocketmq.namesrv.NamesrvController
+    */
     public static NamesrvController createNamesrvController(String[] args) throws IOException, JoranException {
+        // 设置版本
         System.setProperty(RemotingCommand.REMOTING_VERSION_KEY, Integer.toString(MQVersion.CURRENT_VERSION));
         //PackageConflictDetect.detectFastjson();
 
@@ -82,6 +89,7 @@ public class NamesrvStartup {
         final NamesrvConfig namesrvConfig = new NamesrvConfig();
         final NettyServerConfig nettyServerConfig = new NettyServerConfig();
         nettyServerConfig.setListenPort(9876);
+        // 可以使用 -c configFile来指定配置参数
         if (commandLine.hasOption('c')) {
             String file = commandLine.getOptionValue('c');
             if (file != null) {
@@ -105,6 +113,7 @@ public class NamesrvStartup {
             System.exit(0);
         }
 
+        // 可以使用 --属性名来指定配置参数    --listenPort 9876
         MixAll.properties2Object(ServerUtil.commandLine2Properties(commandLine), namesrvConfig);
 
         if (null == namesrvConfig.getRocketmqHome()) {

@@ -17,14 +17,15 @@
 
 package org.apache.rocketmq.client;
 
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
 import org.apache.rocketmq.client.exception.MQClientException;
 import org.apache.rocketmq.client.producer.DefaultMQProducer;
 import org.apache.rocketmq.common.MixAll;
 import org.apache.rocketmq.common.UtilAll;
 import org.apache.rocketmq.common.message.Message;
 import org.apache.rocketmq.common.protocol.ResponseCode;
+
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 /**
  * Common Validator
@@ -49,6 +50,14 @@ public class Validators {
     /**
      * Validate group
      */
+    /**
+     * <p>检查group</p>
+     * <p>不能为空</p>
+     * <p>满足特定正则表达式要求</p>
+     * <p>长度不能大于255</p>
+     * @param group :
+     * @return void
+    */
     public static void checkGroup(String group) throws MQClientException {
         if (UtilAll.isBlank(group)) {
             throw new MQClientException("the specified group is blank", null);

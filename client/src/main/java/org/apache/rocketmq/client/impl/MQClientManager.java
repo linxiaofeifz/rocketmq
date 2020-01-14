@@ -16,14 +16,15 @@
  */
 package org.apache.rocketmq.client.impl;
 
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.ConcurrentMap;
-import java.util.concurrent.atomic.AtomicInteger;
 import org.apache.rocketmq.client.ClientConfig;
 import org.apache.rocketmq.client.impl.factory.MQClientInstance;
 import org.apache.rocketmq.client.log.ClientLogger;
 import org.apache.rocketmq.logging.InternalLogger;
 import org.apache.rocketmq.remoting.RPCHook;
+
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentMap;
+import java.util.concurrent.atomic.AtomicInteger;
 
 public class MQClientManager {
     private final static InternalLogger log = ClientLogger.getLog();
@@ -44,9 +45,19 @@ public class MQClientManager {
         return getAndCreateMQClientInstance(clientConfig, null);
     }
 
+    /**
+     * <p>创建MQClientInstance</p>
+     * @param clientConfig :
+     * @param rpcHook :
+     * @return org.apache.rocketmq.client.impl.factory.MQClientInstance
+    */
     public MQClientInstance getAndCreateMQClientInstance(final ClientConfig clientConfig, RPCHook rpcHook) {
+        // 创建cilentId
         String clientId = clientConfig.buildMQClientId();
+        // 从缓存中根据cilentId获取MQClientInstance
         MQClientInstance instance = this.factoryTable.get(clientId);
+        // 缓存中没有对应的MQClientInstance
+        // 创建一个MQClientInstance，并放入缓存
         if (null == instance) {
             instance =
                 new MQClientInstance(clientConfig.cloneClientConfig(),

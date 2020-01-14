@@ -16,6 +16,7 @@
  */
 package org.apache.rocketmq.example.quickstart;
 
+import org.apache.commons.lang3.time.DateUtils;
 import org.apache.rocketmq.client.exception.MQClientException;
 import org.apache.rocketmq.client.producer.DefaultMQProducer;
 import org.apache.rocketmq.client.producer.SendResult;
@@ -31,6 +32,7 @@ public class Producer {
         /*
          * Instantiate with a producer group name.
          */
+        // 初始化一个DefaultMQProducer
         DefaultMQProducer producer = new DefaultMQProducer("please_rename_unique_group_name");
 
         /*
@@ -50,6 +52,7 @@ public class Producer {
          */
         // 设置namesvr地址
         producer.setNamesrvAddr("127.0.0.1:9876");
+        // 启动producer
         producer.start();
 
         for (int i = 0; i < 1000; i++) {
@@ -66,6 +69,7 @@ public class Producer {
                 /*
                  * Call send message to deliver message to one of brokers.
                  */
+                // 发送消息
                 SendResult sendResult = producer.send(msg);
 
                 System.out.printf("%s%n", sendResult);
@@ -78,6 +82,7 @@ public class Producer {
         /*
          * Shut down once the producer instance is not longer in use.
          */
-        producer.shutdown();
+//        producer.shutdown();
+        Thread.sleep(DateUtils.MILLIS_PER_DAY);
     }
 }

@@ -27,6 +27,11 @@ public class Message implements Serializable {
 
     private String topic;
     private int flag;
+    // 扩展属性 ，主要包括：
+    // tags
+    // keys 空格隔开
+    // waitStoreMsgOK 消息发送时，是否等消息存储完成后再返回
+    // DelayTimeLevel 消息延时级别，用于定时消息或消息重试
     private Map<String, String> properties;
     private byte[] body;
     private String transactionId;

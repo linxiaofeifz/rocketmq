@@ -276,12 +276,14 @@ public class DefaultMQProducer extends ClientConfig implements MQProducer {
      * this method before sending or querying messages.
      * </strong>
      * </p>
-     *
+     * 启动producer实例
+     * 执行了很多内部初始化的过程
      * @throws MQClientException if there is any unexpected error.
      */
     @Override
     public void start() throws MQClientException {
         this.setProducerGroup(withNamespace(this.producerGroup));
+        // 执行defaultMQProducerImpl的启动
         this.defaultMQProducerImpl.start();
         if (null != traceDispatcher) {
             try {

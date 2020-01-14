@@ -16,43 +16,13 @@
  */
 package org.apache.rocketmq.client.impl.factory;
 
-import java.io.UnsupportedEncodingException;
-import java.net.DatagramSocket;
-import java.util.Collections;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.Iterator;
-import java.util.List;
-import java.util.Map;
-import java.util.Map.Entry;
-import java.util.Random;
-import java.util.Set;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.ConcurrentMap;
-import java.util.concurrent.Executors;
-import java.util.concurrent.ScheduledExecutorService;
-import java.util.concurrent.ThreadFactory;
-import java.util.concurrent.TimeUnit;
-import java.util.concurrent.atomic.AtomicLong;
-import java.util.concurrent.locks.Lock;
-import java.util.concurrent.locks.ReentrantLock;
-
 import org.apache.commons.lang3.StringUtils;
 import org.apache.rocketmq.client.ClientConfig;
 import org.apache.rocketmq.client.admin.MQAdminExtInner;
 import org.apache.rocketmq.client.exception.MQBrokerException;
 import org.apache.rocketmq.client.exception.MQClientException;
-import org.apache.rocketmq.client.impl.ClientRemotingProcessor;
-import org.apache.rocketmq.client.impl.FindBrokerResult;
-import org.apache.rocketmq.client.impl.MQAdminImpl;
-import org.apache.rocketmq.client.impl.MQClientAPIImpl;
-import org.apache.rocketmq.client.impl.MQClientManager;
-import org.apache.rocketmq.client.impl.consumer.DefaultMQPullConsumerImpl;
-import org.apache.rocketmq.client.impl.consumer.DefaultMQPushConsumerImpl;
-import org.apache.rocketmq.client.impl.consumer.MQConsumerInner;
-import org.apache.rocketmq.client.impl.consumer.ProcessQueue;
-import org.apache.rocketmq.client.impl.consumer.PullMessageService;
-import org.apache.rocketmq.client.impl.consumer.RebalanceService;
+import org.apache.rocketmq.client.impl.*;
+import org.apache.rocketmq.client.impl.consumer.*;
 import org.apache.rocketmq.client.impl.producer.DefaultMQProducerImpl;
 import org.apache.rocketmq.client.impl.producer.MQProducerInner;
 import org.apache.rocketmq.client.impl.producer.TopicPublishInfo;
@@ -65,25 +35,30 @@ import org.apache.rocketmq.common.ServiceState;
 import org.apache.rocketmq.common.UtilAll;
 import org.apache.rocketmq.common.constant.PermName;
 import org.apache.rocketmq.common.filter.ExpressionType;
-import org.apache.rocketmq.common.protocol.NamespaceUtil;
-import org.apache.rocketmq.logging.InternalLogger;
 import org.apache.rocketmq.common.message.MessageExt;
 import org.apache.rocketmq.common.message.MessageQueue;
+import org.apache.rocketmq.common.protocol.NamespaceUtil;
 import org.apache.rocketmq.common.protocol.body.ConsumeMessageDirectlyResult;
 import org.apache.rocketmq.common.protocol.body.ConsumerRunningInfo;
-import org.apache.rocketmq.common.protocol.heartbeat.ConsumeType;
-import org.apache.rocketmq.common.protocol.heartbeat.ConsumerData;
-import org.apache.rocketmq.common.protocol.heartbeat.HeartbeatData;
-import org.apache.rocketmq.common.protocol.heartbeat.ProducerData;
-import org.apache.rocketmq.common.protocol.heartbeat.SubscriptionData;
+import org.apache.rocketmq.common.protocol.heartbeat.*;
 import org.apache.rocketmq.common.protocol.route.BrokerData;
 import org.apache.rocketmq.common.protocol.route.QueueData;
 import org.apache.rocketmq.common.protocol.route.TopicRouteData;
+import org.apache.rocketmq.logging.InternalLogger;
 import org.apache.rocketmq.remoting.RPCHook;
 import org.apache.rocketmq.remoting.common.RemotingHelper;
 import org.apache.rocketmq.remoting.exception.RemotingException;
 import org.apache.rocketmq.remoting.netty.NettyClientConfig;
 import org.apache.rocketmq.remoting.protocol.RemotingCommand;
+
+import java.io.UnsupportedEncodingException;
+import java.net.DatagramSocket;
+import java.util.*;
+import java.util.Map.Entry;
+import java.util.concurrent.*;
+import java.util.concurrent.atomic.AtomicLong;
+import java.util.concurrent.locks.Lock;
+import java.util.concurrent.locks.ReentrantLock;
 
 public class MQClientInstance {
     private final static long LOCK_TIMEOUT_MILLIS = 3000;
@@ -223,6 +198,10 @@ public class MQClientInstance {
         return mqList;
     }
 
+    /**
+     * <p> MQClient启动</p>
+     * @return void
+    */
     public void start() throws MQClientException {
 
         synchronized (this) {
@@ -230,18 +209,24 @@ public class MQClientInstance {
                 case CREATE_JUST:
                     this.serviceState = ServiceState.START_FAILED;
                     // If not specified,looking address from name server
+                    // 如果namesvr为空，尝试从http server获取namesvr地址
                     if (null == this.clientConfig.getNamesrvAddr()) {
                         this.mQClientAPIImpl.fetchNameServerAddr();
                     }
                     // Start request-response channel
+                    // 启动MQClientAPIImpl，初始化NettyClient
                     this.mQClientAPIImpl.start();
                     // Start various schedule tasks
+                    // 启动定时任务
                     this.startScheduledTask();
                     // Start pull service
+                    // 启动pull service ，处理pullrequest
                     this.pullMessageService.start();
                     // Start rebalance service
+                    // 开启负载均衡service
                     this.rebalanceService.start();
                     // Start push service
+                    //6、启动Client内置的producer
                     this.defaultMQProducer.getDefaultMQProducerImpl().start(false);
                     log.info("the client factory [{}] start OK", this.clientId);
                     this.serviceState = ServiceState.RUNNING;
@@ -258,7 +243,12 @@ public class MQClientInstance {
         }
     }
 
+    /**
+     * <p>启动MQClientInstance定时任务</p>
+     * @return void
+    */
     private void startScheduledTask() {
+        // 定时从http server获取namesvr地址
         if (null == this.clientConfig.getNamesrvAddr()) {
             this.scheduledExecutorService.scheduleAtFixedRate(new Runnable() {
 
@@ -273,6 +263,8 @@ public class MQClientInstance {
             }, 1000 * 10, 1000 * 60 * 2, TimeUnit.MILLISECONDS);
         }
 
+        // 定时从namesvr更新所有的topic路由信息
+        // 每隔30s,可配置（pollNameServerInterval）
         this.scheduledExecutorService.scheduleAtFixedRate(new Runnable() {
 
             @Override
@@ -285,6 +277,9 @@ public class MQClientInstance {
             }
         }, 10, this.clientConfig.getPollNameServerInterval(), TimeUnit.MILLISECONDS);
 
+        // 定时清理下线的broker
+        // 发送心跳
+        // 每隔30s, 可配置（heartbeatBrokerInterval）
         this.scheduledExecutorService.scheduleAtFixedRate(new Runnable() {
 
             @Override
@@ -298,6 +293,8 @@ public class MQClientInstance {
             }
         }, 1000, this.clientConfig.getHeartbeatBrokerInterval(), TimeUnit.MILLISECONDS);
 
+        // 持久化所有消费者的offset
+        // 每隔5s,可配置（persistConsumerOffsetInterval）
         this.scheduledExecutorService.scheduleAtFixedRate(new Runnable() {
 
             @Override
@@ -310,6 +307,7 @@ public class MQClientInstance {
             }
         }, 1000 * 10, this.clientConfig.getPersistConsumerOffsetInterval(), TimeUnit.MILLISECONDS);
 
+        // 定时调整线程池
         this.scheduledExecutorService.scheduleAtFixedRate(new Runnable() {
 
             @Override
@@ -327,6 +325,10 @@ public class MQClientInstance {
         return clientId;
     }
 
+    /**
+     * <p>从namesvr更新topic路由信息</p>
+     * @return void
+    */
     public void updateTopicRouteInfoFromNameServer() {
         Set<String> topicList = new HashSet<String>();
 
@@ -349,6 +351,7 @@ public class MQClientInstance {
 
         // Producer
         {
+            // 拿到所有的topic
             Iterator<Entry<String, MQProducerInner>> it = this.producerTable.entrySet().iterator();
             while (it.hasNext()) {
                 Entry<String, MQProducerInner> entry = it.next();
@@ -360,6 +363,7 @@ public class MQClientInstance {
             }
         }
 
+        // 遍历所有topic，每个topic从namesvr获取topic路由信息
         for (String topic : topicList) {
             this.updateTopicRouteInfoFromNameServer(topic);
         }
@@ -388,6 +392,10 @@ public class MQClientInstance {
     /**
      * Remove offline broker
      */
+    /**
+     * <p>清理已经下线的broker</p>
+     * @return void
+    */
     private void cleanOfflineBroker() {
         try {
             if (this.lockNamesrv.tryLock(LOCK_TIMEOUT_MILLIS, TimeUnit.MILLISECONDS))
@@ -407,6 +415,7 @@ public class MQClientInstance {
                         while (it.hasNext()) {
                             Entry<Long, String> ee = it.next();
                             String addr = ee.getValue();
+                            // 如果topic路由信息中不包含该broker,则移除
                             if (!this.isBrokerAddrExistInTopicRouteTable(addr)) {
                                 it.remove();
                                 log.info("the broker addr[{} {}] is offline, remove it", brokerName, addr);
@@ -473,6 +482,7 @@ public class MQClientInstance {
     public void sendHeartbeatToAllBrokerWithLock() {
         if (this.lockHeartbeat.tryLock()) {
             try {
+                // 发送心跳给broker
                 this.sendHeartbeatToAllBroker();
                 this.uploadFilterClassSource();
             } catch (final Exception e) {
@@ -485,7 +495,12 @@ public class MQClientInstance {
         }
     }
 
+    /**
+     * <p>持久化所有消费者的offset</p>
+     * @return void
+    */
     private void persistAllConsumerOffset() {
+        // 遍历所有消费者，调用persistConsumerOffset
         Iterator<Entry<String, MQConsumerInner>> it = this.consumerTable.entrySet().iterator();
         while (it.hasNext()) {
             Entry<String, MQConsumerInner> entry = it.next();
@@ -515,6 +530,11 @@ public class MQClientInstance {
         return updateTopicRouteInfoFromNameServer(topic, false, null);
     }
 
+    /**
+     * <p>判断topic路由信息中是否包含broker</p>
+     * @param addr :
+     * @return boolean
+    */
     private boolean isBrokerAddrExistInTopicRouteTable(final String addr) {
         Iterator<Entry<String, TopicRouteData>> it = this.topicRouteTable.entrySet().iterator();
         while (it.hasNext()) {
@@ -554,6 +574,7 @@ public class MQClientInstance {
                         Long id = entry1.getKey();
                         String addr = entry1.getValue();
                         if (addr != null) {
+                            // 生产者只跟master建立连接，发送心跳
                             if (consumerEmpty) {
                                 if (id != MixAll.MASTER_ID)
                                     continue;
@@ -625,6 +646,7 @@ public class MQClientInstance {
                             }
                         }
                     } else {
+                        // 从namesvr获取topic路由信息
                         topicRouteData = this.mQClientAPIImpl.getTopicRouteInfoFromNameServer(topic, 1000 * 3);
                     }
                     if (topicRouteData != null) {
@@ -933,6 +955,12 @@ public class MQClientInstance {
         }
     }
 
+    /**
+     * <p>注册Producer</p>
+     * @param group :
+     * @param producer :
+     * @return boolean
+    */
     public boolean registerProducer(final String group, final DefaultMQProducerImpl producer) {
         if (null == group || null == producer) {
             return false;
